@@ -1,27 +1,67 @@
 import Foundation
 public final class CommandLineTool {
     private let arguments: [String]
+    private var lookups: [String: String]
     static let networksetup:String = "/usr/sbin/networksetup" 
 
     public init(arguments: [String] = CommandLine.arguments) { 
         self.arguments = arguments
+        self.lookups = [String: String]()
+    }
+
+    private enum commandType {
+        case switchInterface
+        case toggleInterface
     }
 
     public func run() throws {
-        guard arguments.count == 3 else {
-            print("Error: incorrect number of parameters specified")
+        print(arguments)
+        var parseLocation = 1
+        var execCommandtype: commandType?
+        var commandParameter: String?
+
+        while parseLocation < arguments.count {
+            switch arguments[parseLocation] {
+                case "-s":
+                    execCommandtype = .switchInterface
+                    parseLocation += 1
+                    if (parseLocation < arguments.count) {
+                        commandParameter = arguments[parseLocation]
+                        parseLocation += 1
+                    }
+                case "-t":
+                    execCommandtype = .toggleInterface
+                    parseLocation += 1
+                    if (parseLocation < arguments.count) {
+                        commandParameter = arguments[parseLocation]
+                        parseLocation += 1
+                    }
+                case "-l":
+                    parseLocation += 1
+                    if (parseLocation < arguments.count) {
+                        extractLoopkup(fromFile: arguments[parseLocation])
+                        parseLocation += 1
+                    }
+                default:
+                    print("unknown parameter provided " + arguments[parseLocation])
+                    parseLocation += 1
+            }
+        }
+
+        guard execCommandtype != nil else {
+            print("No command provided.")
+            return
+        }
+        guard commandParameter != nil else {
+            print("no parameter provided")
             return
         }
 
-        let type = arguments[1]
-
-        switch type {
-            case "-s":
-                Switch(ToInterface: arguments[2])
-            case "-t":
-                Toggle(FromFile: arguments[2])
-            default:
-                print("hi")
+        switch execCommandtype! {
+            case .switchInterface:
+                Switch(ToInterface: commandParameter!)
+            case .toggleInterface:
+                Toggle(FromFile: commandParameter!)
         }
     }
 
@@ -29,7 +69,16 @@ public final class CommandLineTool {
         //Execute shell command to get list of network service order
         let networkList = shell(launchPath: CommandLineTool.networksetup, arguments: ["listnetworkserviceorder"])
 
-        switchInterface(fromList: networkList, to: interface)
+        switchInterface(fromList: networkList, to: translateLookup(fromInterface: interface))
+    }
+
+    private func translateLookup(fromInterface interface: String) -> String {
+        if (lookups[interface] != nil) {
+            return lookups[interface]!
+        }
+        else {
+            return interface
+        }
     }
 
     public func Toggle(FromFile file: String) {
@@ -45,8 +94,27 @@ public final class CommandLineTool {
             switchInterface(fromList: networkList, to: determineToggle(interfaces: interfaceArray, toggles: toggleArray)!)
         }
         catch {
-            print("Could not find file")
+            print("Could not open toggle file " + file + ".")
         }
+    }
+
+    private func extractLoopkup(fromFile fileName:String) {
+        let pwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let fileDir = pwd.appendingPathComponent(fileName)
+        do {
+            let lookupArray = try String(contentsOf: fileDir, encoding: .utf8).components(separatedBy: .newlines)
+            for lookup in lookupArray {
+                let components = lookup.components(separatedBy: ":")
+                if components.count == 2 {
+                    self.lookups[components[0]] = components[1]
+                }
+            }
+        }
+        catch {
+            print("Could not open lookup file " + fileName + ". Ignoring lookup.")
+            lookups = [:]
+        }
+
     }
 
     private func extractIntefaceArray(from networklist:String) -> [String] {
@@ -67,7 +135,7 @@ public final class CommandLineTool {
         var interfaceArray = extractIntefaceArray(from: networkList)
         //Make sure that the specified network interface is in the network list
         guard let i = interfaceArray.index(of: search) else {
-            print("Error: The specified network interface was not found in the interface list.")
+            print("Error: The specified network interface " + search + " was not found in the interface list.")
             return
         }
 
