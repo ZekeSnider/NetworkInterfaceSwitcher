@@ -15,45 +15,64 @@ public final class CommandLineTool {
     }
 
     public func run() throws {
-        print(arguments)
         var parseLocation = 1
         var execCommandtype: commandType?
         var commandParameter: String?
+        var lookupSet = false
+        var parameterPending = false
+        var lookupParameterPending = false
 
         while parseLocation < arguments.count {
-            switch arguments[parseLocation] {
-                case "-s":
-                    execCommandtype = .switchInterface
-                    parseLocation += 1
-                    if (parseLocation < arguments.count) {
-                        commandParameter = arguments[parseLocation]
-                        parseLocation += 1
-                    }
-                case "-t":
-                    execCommandtype = .toggleInterface
-                    parseLocation += 1
-                    if (parseLocation < arguments.count) {
-                        commandParameter = arguments[parseLocation]
-                        parseLocation += 1
-                    }
-                case "-l":
-                    parseLocation += 1
-                    if (parseLocation < arguments.count) {
-                        extractLoopkup(fromFile: arguments[parseLocation])
-                        parseLocation += 1
-                    }
-                default:
-                    print("unknown parameter provided " + arguments[parseLocation])
-                    parseLocation += 1
+            if (parameterPending) {
+                commandParameter = arguments[parseLocation]
+                parameterPending = false
             }
+            else if (lookupParameterPending) {
+                extractLoopkup(fromFile: arguments[parseLocation])
+                lookupSet = true
+                lookupParameterPending = false
+            }
+            else {
+                switch arguments[parseLocation] {
+                    case "-s":
+                        guard execCommandtype == nil else {
+                            print("Error: command type specified more than once")
+                            return
+                        }
+                        execCommandtype = .switchInterface
+                        parameterPending = true
+                    case "-t":
+                        guard execCommandtype == nil else {
+                            print("Error: command type specified more than once")
+                            return
+                        }
+                        execCommandtype = .toggleInterface
+                        parameterPending = true
+                    case "-l":
+                        guard !lookupSet else {
+                            print("Error: Lookup file specified multiple times")
+                            return
+                        }
+                        lookupParameterPending = true
+                    default:
+                        print("Eror: unknown parameter provided " + arguments[parseLocation])
+                        
+                }
+            }
+            parseLocation += 1  
+        }
+
+        guard !lookupParameterPending else {
+            print("Error: lookup invoked but no lookup file provided")
+            return
         }
 
         guard execCommandtype != nil else {
-            print("No command provided.")
+            print("Error: no command provided.")
             return
         }
         guard commandParameter != nil else {
-            print("no parameter provided")
+            print("Error: command specified but no parameter provided")
             return
         }
 
@@ -68,7 +87,6 @@ public final class CommandLineTool {
     public func Switch(ToInterface interface: String) {
         //Execute shell command to get list of network service order
         let networkList = shell(launchPath: CommandLineTool.networksetup, arguments: ["listnetworkserviceorder"])
-
         switchInterface(fromList: networkList, to: translateLookup(fromInterface: interface))
     }
 
@@ -148,7 +166,7 @@ public final class CommandLineTool {
 
         //Update the network interface priority
         let _ = shell(launchPath: CommandLineTool.networksetup, arguments: interfaceArray)
-        print("Succesfully updated the network interface priority.")
+        print("Succesfully updated the network interface priority to set " + search + " as the first interface.")
     }
 
     //Interface array is an array of interfaces from listnetworkserviceorder response
