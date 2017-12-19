@@ -1,4 +1,4 @@
-# NetworkInterfaceSwitcher
+# Network Interface Switcher
 <p align="center"><img alt="demo gif" src="/demo.gif"/></p>  
 A command line utility for macOS that will switch the system's network interface priority. The only way to do this programmatically on macOS is the networksetup CLI, which requires verbose parameters and does not allow easy toggling. This CLI allows easier switching, if you need to switch frequently between Wi-Fi and Ethernet networks for example.
 
@@ -7,7 +7,7 @@ You can download a precompiled executable from the Github releases page. If you 
 
 `make release`  
 
-If you'd like the tool to run from anywhere on the command line, copy it to `/usr/local/bin`.
+If you'd like the tool to run from anywhere on the command line, copy the release build to `/usr/local/bin`.
 
 ## Parameters:
 
